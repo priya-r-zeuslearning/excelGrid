@@ -46,7 +46,7 @@ const RENDER_BUFFER_PX = 200;
 const HEADER_SIZE = 40;
 
 /** How many pixels near an edge counts as a "resize hotspot" */
-const RESIZE_GUTTER = 5;
+// const RESIZE_GUTTER = 5;
 let dpr = window.devicePixelRatio || 1;
 /**
  * @class Grid
@@ -240,7 +240,7 @@ export class Grid {
     this.addEventListeners();
     this.resizeCanvas();
     // Log the number of created cells at startup
-    // console.log("Cells created at startup:", this.countCreatedCells());
+  // console.log("Cells created at startup:", this.countCreatedCells());
 
     // Clean up animation when window loses focus
     window.addEventListener("blur", () => {
@@ -1948,7 +1948,16 @@ export class Grid {
       paddingRight = "8px";
       this.editorInput.style.textAlign = "left";
     }
-
+    const headerBottom = headerHeight + toolbarHeight + HEADER_SIZE;
+    const clipTop = Math.max(0, headerBottom - top);
+    const clipLeft = Math.max(0, this.rowHeaderWidth - left);
+    
+    if (clipTop > 0 || clipLeft > 0) {
+      this.editorInput.style.clipPath = `inset(${clipTop}px 0px 0px ${clipLeft}px)`;
+    } else {
+      this.editorInput.style.clipPath = "none";
+    }
+    
     Object.assign(this.editorInput.style, {
       left: `${left + 1}px`,
       top: `${top + 1}px`,
