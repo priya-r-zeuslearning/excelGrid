@@ -1,5 +1,5 @@
-import type { EventHandler } from '../EventHandler';
-import { Grid } from '../../core/grid';
+import type { EventHandler } from "../EventHandler";
+import { Grid } from "../../core/grid";
 //for column
 export class HeaderDragHandler implements EventHandler {
   private grid: Grid;
@@ -11,13 +11,19 @@ export class HeaderDragHandler implements EventHandler {
   private columnSelectionAnchor: number | null = null;
   private columnSelectionFocus: number | null = null;
 
-  private autoScrollDirection: 'left' | 'right' | null = null;
+  private autoScrollDirection: "left" | "right" | null = null;
   private autoScrollAnimationFrameId: number | null = null;
   private lastPointerMoveEvent: MouseEvent | null = null; // To keep track of the latest mouse position
 
   constructor(grid: Grid) {
     this.grid = grid;
   }
+
+  /**
+   * Stops the auto-scroll animation if active.
+   * Cancels the current animation frame request and resets the
+   * auto-scroll direction and animation frame ID to null.
+   */
 
   private stopAutoScroll(): void {
     if (this.autoScrollAnimationFrameId !== null) {
@@ -27,46 +33,81 @@ export class HeaderDragHandler implements EventHandler {
     this.autoScrollDirection = null;
   }
 
+  /**
+   * Animation step for auto-scrolling while dragging a column header.
+   * Scroll the column headers by a fixed amount, then re-evaluate the column selection
+   * based on the latest known mouse position relative to content.
+   * If the auto-scroll direction is still set, schedule the next animation frame.
+   * Otherwise, clear the auto-scroll animation frame ID.
+   */
   private scrollStep(): void {
-    if (!this.isColHeaderDragActive || this.autoScrollDirection === null || !this.lastPointerMoveEvent) {
+    if (
+      !this.isColHeaderDragActive ||
+      this.autoScrollDirection === null ||
+      !this.lastPointerMoveEvent
+    ) {
       this.stopAutoScroll();
       return;
     }
 
     const scrollAmount = 20; // Adjust for desired speed
-    const container = this.grid['container'];
+    const container = this.grid["container"];
 
-    if (this.autoScrollDirection === 'left') {
+    if (this.autoScrollDirection === "left") {
       container.scrollLeft = Math.max(0, container.scrollLeft - scrollAmount);
-    } else if (this.autoScrollDirection === 'right') {
-      container.scrollLeft = Math.min(container.scrollWidth - container.clientWidth, container.scrollLeft + scrollAmount);
+    } else if (this.autoScrollDirection === "right") {
+      container.scrollLeft = Math.min(
+        container.scrollWidth - container.clientWidth,
+        container.scrollLeft + scrollAmount
+      );
     }
 
     // After scrolling, re-evaluate selection based on the latest known mouse position relative to content
-    const { x: contentX } = this.grid['getMousePos'](this.lastPointerMoveEvent);
+    const { x: contentX } = this.grid["getMousePos"](this.lastPointerMoveEvent);
     const HEADER_SIZE = 40;
-    const { col: currentColIndex } = this.grid['findColumnByOffset'](contentX - (this.grid as any).rowHeaderWidth);
+    const { col: currentColIndex } = this.grid["findColumnByOffset"](
+      contentX - (this.grid as any).rowHeaderWidth
+    );
     this.columnSelectionFocus = currentColIndex;
-    this.grid['selMgr'].updateDrag(0, currentColIndex);
+    this.grid["selMgr"].updateDrag(0, currentColIndex);
 
-    const startCol = Math.min(this.columnSelectionAnchor!, this.columnSelectionFocus!);
-    const endCol = Math.max(this.columnSelectionAnchor!, this.columnSelectionFocus!);
+    const startCol = Math.min(
+      this.columnSelectionAnchor!,
+      this.columnSelectionFocus!
+    );
+    const endCol = Math.max(
+      this.columnSelectionAnchor!,
+      this.columnSelectionFocus!
+    );
     const selectedCols: number[] = [];
     for (let c = startCol; c <= endCol; c++) {
       selectedCols.push(c);
     }
-    this.grid['selMgr'].setSelectedColumns(selectedCols);
-    this.grid['scheduleRender']();
+    this.grid["selMgr"].setSelectedColumns(selectedCols);
+    this.grid["scheduleRender"]();
 
     // Continue scrolling if direction is still set
     if (this.autoScrollDirection) {
-        this.autoScrollAnimationFrameId = requestAnimationFrame(this.scrollStep.bind(this));
+      this.autoScrollAnimationFrameId = requestAnimationFrame(
+        this.scrollStep.bind(this)
+      );
     } else {
-        this.autoScrollAnimationFrameId = null; // Ensure it's cleared if direction became null
+      this.autoScrollAnimationFrameId = null; // Ensure it's cleared if direction became null
     }
   }
 
-  hitTest(x: number, y: number): boolean { // x, y are canvas offsetX, offsetY
+  /**
+   * Determines if a pointer event is within the column header area,
+   * excluding the resize gutter.
+   *
+   * @param x - The x-coordinate of the pointer event (canvas offsetX).
+   * @param y - The y-coordinate of the pointer event (canvas offsetY).
+   * @returns `true` if the pointer is within the column header bar,
+   *          excluding the resize gutter; `false` otherwise.
+   */
+
+  hitTest(x: number, y: number): boolean {
+    // x, y are canvas offsetX, offsetY
     const COL_HEADER_HEIGHT = 40; // Actual height of the column header bar
     const RESIZE_GUTTER = 5;
     const currentGridRowHeaderWidth = this.grid.getRowHeaderWidth();
@@ -75,28 +116,35 @@ export class HeaderDragHandler implements EventHandler {
     if (y < COL_HEADER_HEIGHT && x >= currentGridRowHeaderWidth) {
       // Convert canvas-relative x to content-relative x for findColumnByOffset
       // findColumnByOffset expects offset from the start of the data columns (after row headers)
-      const contentRelativeX = x + this.grid['container'].scrollLeft - currentGridRowHeaderWidth;
-      const { col, within } = this.grid['findColumnByOffset'](contentRelativeX);
+      const contentRelativeX =
+        x + this.grid["container"].scrollLeft - currentGridRowHeaderWidth;
+      const { col, within } = this.grid["findColumnByOffset"](contentRelativeX);
 
       // Check if it's not in the resize gutter of that column
       // This check needs to be robust. The ColumnResizeHandler should have priority.
       // This hitTest assumes ColumnResizeHandler.hitTest would have returned false.
-      if (within < this.grid['colMgr'].getWidth(col) - RESIZE_GUTTER) {
+      if (within < this.grid["colMgr"].getWidth(col) - RESIZE_GUTTER) {
         return true;
       }
     }
     return false;
   }
 
+/**
+ * Called when a pointer is pressed down on a column header.
+ * @param evt - The mouse event associated with the pointer down action.
+ *
+ */
+
   onPointerDown(evt: MouseEvent): void {
     // Finish editing if a cell is being edited
-    if (this.grid['editorInput'] && this.grid['editingCell']) {
-      this.grid['finishEditing'](true);
+    if (this.grid["editorInput"] && this.grid["editingCell"]) {
+      this.grid["finishEditing"](true);
     }
 
-    const { x } = this.grid['getMousePos'](evt); // x relative to content
+    const { x } = this.grid["getMousePos"](evt); // x relative to content
     const HEADER_SIZE = 40;
-    const { col: colIndex } = this.grid['findColumnByOffset'](x - HEADER_SIZE);
+    const { col: colIndex } = this.grid["findColumnByOffset"](x - HEADER_SIZE);
 
     this.isColHeaderDragActive = true;
     this.colHeaderDragged = false;
@@ -105,11 +153,19 @@ export class HeaderDragHandler implements EventHandler {
     this.columnSelectionFocus = colIndex;
     this.dragStartMouse = { x: evt.clientX, y: evt.clientY };
 
-    this.grid['selMgr'].clearSelectedRows(); // Clear row selections
+    this.grid["selMgr"].clearSelectedRows(); // Clear row selections
     (this.grid as any).pendingEditCell = { row: 0, col: colIndex }; // Set pending edit cell on grid for now
     // Do NOT select yet; wait for mouseup or drag to differentiate
   }
 
+  /**
+   * Called when a pointer is moved.
+   * @param evt The event associated with the pointer move.
+   *
+   * Sets the grid's canvas cursor to 'grab' if the pointer is within the column
+   * header area, but not in a resize gutter. If the pointer is in a resize gutter,
+   * ColumnResizeHandler should have set the cursor to 'col-resize'.
+   */
   onPointerMove(evt: MouseEvent): void {
     const rect = (evt.target as HTMLElement).getBoundingClientRect();
     const mouseX = evt.clientX - rect.left;
@@ -120,95 +176,129 @@ export class HeaderDragHandler implements EventHandler {
     // this.grid['canvas'].style.cursor = 'cell';
 
     if (mouseY < HEADER_SIZE && mouseX >= HEADER_SIZE) {
-        // Check if it's not a resize hover (ColumnResizeHandler's onPointerMove should handle that)
-        const { col, within } = this.grid['findColumnByOffset'](mouseX - HEADER_SIZE);
-        const RESIZE_GUTTER = 5;
-        if (within < this.grid['colMgr'].getWidth(col) - RESIZE_GUTTER) {
-            this.grid['canvas'].style.cursor = 'grab';
-        }
-        // If it IS a resize gutter, ColumnResizeHandler.onPointerMove will set col-resize
+      // Check if it's not a resize hover (ColumnResizeHandler's onPointerMove should handle that)
+      const { col, within } = this.grid["findColumnByOffset"](
+        mouseX - HEADER_SIZE
+      );
+      const RESIZE_GUTTER = 5;
+      if (within < this.grid["colMgr"].getWidth(col) - RESIZE_GUTTER) {
+        this.grid["canvas"].style.cursor = "grab";
+      }
+      // If it IS a resize gutter, ColumnResizeHandler.onPointerMove will set col-resize
     }
   }
 
+  /**
+   * Called when a pointer is dragged.
+   * @param evt The mouse event associated with the pointer drag action.
+   *
+   */
   onPointerDrag(evt: MouseEvent): void {
     if (!this.isColHeaderDragActive || this.dragStartColHeader === null) {
-        this.stopAutoScroll();
-        return;
+      this.stopAutoScroll();
+      return;
     }
     this.lastPointerMoveEvent = evt; // Store the latest event for scrollStep
 
-    const { x: contentX } = this.grid['getMousePos'](evt);
+    const { x: contentX } = this.grid["getMousePos"](evt);
     const HEADER_SIZE = 40; // This is column header height, but findColumnByOffset needs offset from row header
     const rowHeaderAreaWidth = (this.grid as any).rowHeaderWidth;
 
-
-    if (!this.grid['selMgr'].isDragging() && this.dragStartMouse) {
+    if (!this.grid["selMgr"].isDragging() && this.dragStartMouse) {
       const dx = Math.abs(evt.clientX - this.dragStartMouse.x);
       if (dx > 2) {
-        this.grid['selMgr'].startDrag(0, this.dragStartColHeader);
-        this.grid['selMgr'].clearSelectedColumns();
-        this.grid['selMgr'].addSelectedColumn(this.dragStartColHeader);
+        this.grid["selMgr"].startDrag(0, this.dragStartColHeader);
+        this.grid["selMgr"].clearSelectedColumns();
+        this.grid["selMgr"].addSelectedColumn(this.dragStartColHeader);
         this.colHeaderDragged = true;
       }
     }
 
-    if (this.grid['selMgr'].isDragging()) {
-      const { col: currentColIndex } = this.grid['findColumnByOffset'](contentX - rowHeaderAreaWidth);
+    if (this.grid["selMgr"].isDragging()) {
+      const { col: currentColIndex } = this.grid["findColumnByOffset"](
+        contentX - rowHeaderAreaWidth
+      );
       this.columnSelectionFocus = currentColIndex;
-      this.grid['selMgr'].updateDrag(0, currentColIndex);
+      this.grid["selMgr"].updateDrag(0, currentColIndex);
 
-      const startCol = Math.min(this.columnSelectionAnchor!, this.columnSelectionFocus!);
-      const endCol = Math.max(this.columnSelectionAnchor!, this.columnSelectionFocus!);
+      const startCol = Math.min(
+        this.columnSelectionAnchor!,
+        this.columnSelectionFocus!
+      );
+      const endCol = Math.max(
+        this.columnSelectionAnchor!,
+        this.columnSelectionFocus!
+      );
       const selectedCols: number[] = [];
       for (let c = startCol; c <= endCol; c++) {
         selectedCols.push(c);
       }
-      this.grid['selMgr'].setSelectedColumns(selectedCols);
-      this.grid['scheduleRender'](); // Render normal drag update
+      this.grid["selMgr"].setSelectedColumns(selectedCols);
+      this.grid["scheduleRender"](); // Render normal drag update
 
       // Auto-scroll logic
-      const rect = this.grid['canvas'].getBoundingClientRect();
+      const rect = this.grid["canvas"].getBoundingClientRect();
       const mouseXCanvas = evt.clientX - rect.left;
       const edgeThreshold = 35; // Increased threshold a bit
-      const clientWidth = this.grid['canvas'].clientWidth;
+      const clientWidth = this.grid["canvas"].clientWidth;
 
-      let newScrollDirection: 'left' | 'right' | null = null;
-      if (mouseXCanvas > clientWidth - edgeThreshold && mouseXCanvas <= clientWidth) { // Check <= clientWidth
-        newScrollDirection = 'right';
-      } else if (mouseXCanvas < edgeThreshold && mouseXCanvas >=0) { // Check >= 0
-        newScrollDirection = 'left';
+      let newScrollDirection: "left" | "right" | null = null;
+      if (
+        mouseXCanvas > clientWidth - edgeThreshold &&
+        mouseXCanvas <= clientWidth
+      ) {
+        // Check <= clientWidth
+        newScrollDirection = "right";
+      } else if (mouseXCanvas < edgeThreshold && mouseXCanvas >= 0) {
+        // Check >= 0
+        newScrollDirection = "left";
       }
 
       if (newScrollDirection) {
         this.autoScrollDirection = newScrollDirection;
-        if (this.autoScrollAnimationFrameId === null) { // Start if not already scrolling
+        if (this.autoScrollAnimationFrameId === null) {
+          // Start if not already scrolling
           this.scrollStep();
         }
       } else {
         this.stopAutoScroll();
       }
-    } else { // Not dragging with selMgr (e.g. threshold not met yet, or just finished)
-        this.stopAutoScroll();
+    } else {
+      // Not dragging with selMgr (e.g. threshold not met yet, or just finished)
+      this.stopAutoScroll();
     }
   }
 
+  /**
+   * onPointerUp is called when a pointer is released.
+   * @param evt The event associated with the pointer up.
+   *
+   * If the pointer was in the column header area when released, this handler
+   * will select the column at the pointer location and clear any existing
+   * row and column selections. If the pointer was being dragged when released,
+   * this handler will end the drag and set a pending edit cell at the pointer
+   * location.
+   *
+   * If the pointer was not in the column header area when released, this
+   * handler will do nothing.
+   */
   onPointerUp(evt: MouseEvent): void {
     this.stopAutoScroll(); // Stop any active auto-scrolling
 
     if (!this.isColHeaderDragActive) return;
 
     if (!this.colHeaderDragged && this.dragStartColHeader !== null) {
-      this.grid['selMgr'].selectColumn(this.dragStartColHeader);
-      this.grid['selMgr'].clearSelectedColumns();
-      this.grid['selMgr'].addSelectedColumn(this.dragStartColHeader);
-    } else if (this.grid['selMgr'].isDragging()) {
-      this.grid['selMgr'].endDrag();
+      this.grid["selMgr"].selectColumn(this.dragStartColHeader);
+      this.grid["selMgr"].clearSelectedColumns();
+      this.grid["selMgr"].addSelectedColumn(this.dragStartColHeader);
+    } else if (this.grid["selMgr"].isDragging()) {
+      this.grid["selMgr"].endDrag();
       // (this.grid as any).pendingEditCell = null;
     }
 
-    this.grid['scheduleRender']();
-    this.grid['computeSelectionStats']();
-    this.grid['updateToolbarState']();
+    this.grid["scheduleRender"]();
+    this.grid["computeSelectionStats"]();
+    this.grid["updateToolbarState"]();
 
     this.isColHeaderDragActive = false;
     this.dragStartColHeader = null;

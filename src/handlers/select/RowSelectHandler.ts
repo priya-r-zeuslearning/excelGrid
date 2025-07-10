@@ -17,6 +17,10 @@ export class RowSelectHandler implements EventHandler {
 
   constructor(grid: Grid) { this.grid = grid; }
 
+  /**
+   * Stops any auto-scrolling that is currently happening.
+   * @private
+   */
   private stopAutoScroll(): void {
     if (this.autoScrollAnimationFrameId !== null) {
       cancelAnimationFrame(this.autoScrollAnimationFrameId);
@@ -25,13 +29,19 @@ export class RowSelectHandler implements EventHandler {
     this.autoScrollDirection = null;
   }
 
+  /**
+   * This method is called when the user is dragging a row header selection and needs to scroll the grid.
+   * It will scroll the grid by a fixed amount (currently 10px) in the direction of the auto-scrolling.
+   * It will also update the selection focus and render the grid.
+   * @private
+   */
   private scrollStep(): void {
     if (!this.isRowHeaderDragActive || this.autoScrollDirection === null || !this.lastPointerMoveEvent) {
       this.stopAutoScroll();
       return;
     }
 
-    const scrollAmount = 20; // Adjust for desired speed
+    const scrollAmount = 10; // Adjust for desired speed
     const container = this.grid['container'];
     const HEADER_SIZE = 40; // Column header height
 
@@ -60,21 +70,34 @@ export class RowSelectHandler implements EventHandler {
     }
   }
 
+/**
+ * Determines if a given point (x, y) is within the row header area of the grid,
+ * excluding the column header. This method is used to activate the row selection
+ * handler when the pointer is in the designated row header area.
+ * 
+ * @param x - The x-coordinate of the point to test, relative to the grid.
+ * @param y - The y-coordinate of the point to test, relative to the grid.
+ * @returns True if the point is within the row header area, false otherwise.
+ */
+
   hitTest(x: number, y: number): boolean {
     const HEADER_SIZE = 40;
     const RESIZE_GUTTER = 5; // Assuming RowResizeHandler has priority for the gutter
     if (x < HEADER_SIZE && y >= HEADER_SIZE) {
         const { within } = this.grid['findRowByOffset'](y - HEADER_SIZE);
-        // Make sure it's not a resize hit
-        // This relies on RowResizeHandler being checked first or having a more specific hitTest
-        // For now, assume if RowResizeHandler didn't claim it, this can.
-        // A more robust way would be to check `within < this.grid['rowMgr'].getHeight(row) - RESIZE_GUTTER`
-        // but that requires getting the row index here.
       return true;
     }
     return false;
   }
 
+  /**
+   * Handles pointer down events on the row header area. If the pointer is within
+   * the row header area, finish any active editing, clear any column selections,
+   * set the row selection anchor and focus to the row at the pointer position,
+   * and set the pending edit cell to the topmost cell of the row.
+   * 
+   * @param evt The pointer down event.
+   */
   onPointerDown(evt: MouseEvent): void {
     if (this.grid['editorInput'] && this.grid['editingCell']) {
       this.grid['finishEditing'](true);
@@ -95,6 +118,15 @@ export class RowSelectHandler implements EventHandler {
     (this.grid as any).pendingEditCell = { row: rowIndex, col: 0 };
   }
 
+/**
+ * Handles pointer move events on the row header area. This function updates the
+ * cursor style to 'grab' if the pointer is within the row header but not in the
+ * resize gutter area. If the pointer is in the resize gutter area, the 
+ * RowResizeHandler will handle the cursor style change.
+ * 
+ * @param evt - The pointer move event.
+ */
+
   onPointerMove(evt: MouseEvent): void {
     const rect = (evt.target as HTMLElement).getBoundingClientRect();
     const mouseX = evt.clientX - rect.left;
@@ -110,6 +142,14 @@ export class RowSelectHandler implements EventHandler {
         // If it IS a resize gutter, RowResizeHandler.onPointerMove will set row-resize
     }
   }
+
+/**
+ * Handles pointer drag events on the row header area. Initiates row selection
+ * drag if the drag threshold is surpassed. Updates the drag selection and
+ * manages auto-scrolling when dragging beyond the visible area.
+ * 
+ * @param evt - The pointer drag event.
+ */
 
   onPointerDrag(evt: MouseEvent): void {
     if (!this.isRowHeaderDragActive || this.dragStartRow === null) {
@@ -169,6 +209,13 @@ export class RowSelectHandler implements EventHandler {
     }
   }
 
+  /**
+   * Pointer up event handler.
+   * This is called when the user is no longer clicking/dragging.
+   * If the user was dragging a row header, this will either select the row or end the drag.
+   * Clears the row header drag state and updates the grid.
+   * @param evt The mouse event.
+   */
   onPointerUp(evt: MouseEvent): void {
     this.stopAutoScroll();
 

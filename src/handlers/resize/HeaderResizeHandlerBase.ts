@@ -26,17 +26,21 @@ export abstract class HeaderResizeHandlerBase implements EventHandler {
   protected abstract setSize(idx: number, size: number): void;
   protected abstract updateEditorPosition(): void;
 
+  /**
+   * Called when a pointer is pressed down.
+   * @param evt The event associated with the pointer down.
+   */
   onPointerDown(evt: MouseEvent): void {
     // Get content-relative mouse position once
     const { x: contentMouseX, y: contentMouseY } = this.grid['getMousePos'](evt);
 
-    const idx = this.getIndex(evt); // getIndex in derived classes should use getMousePos or be adjusted
-    // Pass content-relative coordinates to getWithin
+    const idx = this.getIndex(evt); 
+    
     const within = this.getWithin(contentMouseX, contentMouseY);
 
     if (within >= this.getManager().getSize(idx) - this.getResizeGutter()) {
       this.resizingIdx = idx;
-      this.dragStartCoord = this.getDragStartCoord(evt); // This already uses getMousePos via derived classes after previous fix
+      this.dragStartCoord = this.getDragStartCoord(evt);
       this.originalSize = this.getManager().getSize(idx);
       this.isResizing = true;
       const selected = this.getSelected();
@@ -52,14 +56,21 @@ export abstract class HeaderResizeHandlerBase implements EventHandler {
     }
   }
 
+  /**
+   * Called when a pointer is moved.
+   * @param evt The event associated with the pointer move.
+   *
+   * Sets the grid's canvas cursor to 'cell' if the pointer is not over a gutter,
+   * and to the appropriate resize cursor when it is over a gutter.
+   */
   onPointerMove(evt: MouseEvent): void {
-    this.grid['canvas'].style.cursor = 'cell'; // Default cursor if not over a gutter
+     this.grid['canvas'].style.cursor = 'cell'; // Default cursor if not over a gutter
 
     // Get content-relative mouse position
     const { x: contentMouseX, y: contentMouseY } = this.grid['getMousePos'](evt);
 
-    const idx = this.getIndex(evt); // getIndex in derived classes already uses getMousePos
-    // Pass content-relative coordinates to getWithin
+    const idx = this.getIndex(evt);
+  
     const within = this.getWithin(contentMouseX, contentMouseY);
 
     if (within >= this.getManager().getSize(idx) - this.getResizeGutter()) {
@@ -67,6 +78,13 @@ export abstract class HeaderResizeHandlerBase implements EventHandler {
     }
   }
 
+  /**
+   * Called when a pointer is moved while a button is pressed down.
+   * @param evt The event associated with the pointer move.
+   *
+   * Updates the size of the column or row being resized, and updates the
+   * command manager's current command with the new size.
+   */
   onPointerDrag(evt: MouseEvent): void {
     if (this.resizingIdx !== null && this.isResizing && this.currentResizeCommand) {
       const d = this.getDragDelta(evt);
@@ -93,6 +111,14 @@ export abstract class HeaderResizeHandlerBase implements EventHandler {
     }
   }
 
+  /**
+   * Called when a pointer is released after a drag.
+   * @param evt The event associated with the pointer release.
+   *
+   * Executes the current resize command if a resizing operation was active,
+   * finalizes the resizing process, and resets the resizing state.
+   */
+
   onPointerUp(evt: MouseEvent): void {
     if (this.isResizing && this.currentResizeCommand) {
       this.grid['commandManager'].execute(this.currentResizeCommand);
@@ -106,6 +132,10 @@ export abstract class HeaderResizeHandlerBase implements EventHandler {
   protected isCompositeCommand(cmd: any): boolean {
     return cmd && Array.isArray(cmd.commands);
   }
+  /**
+   * Sets the canvas stroke color and line width to show a resize pointer
+   * while resizing a column or row.
+   */
   protected setResizeCursor(): void {
     this.grid['ctx'].strokeStyle = '#107C41';
     this.grid['ctx'].lineWidth = 2 / window.devicePixelRatio;

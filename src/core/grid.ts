@@ -150,19 +150,7 @@ export class Grid {
 
   /** @type {number} The last render time. */
   private _lastRenderTime: number = 0;
-  /**
-   * Shifts cells to the right.
-  /**
-   * Throttles the schedule render.
-   */
-  // private throttledScheduleRender(): void {
-  //   const now = performance.now();
-  //   if (now - this._lastRenderTime > 16) {
-  //     // ~60fps
-  //     this._lastRenderTime = now;
-  //     this.scheduleRender();
-  //   }
-  // }
+
 
   // Add this property to the class:
   /** @type {{row: number, col: number}|null} The pending edit cell. */
@@ -219,16 +207,15 @@ export class Grid {
     filler.style.height = virtualHeight + "px";
     filler.style.width = virtualWidth + "px";
     this.canvas.style.cursor ="cell"
+
+
     this.columnResizeHandler = new ColumnResizeHandler(this);
     this.rowResizeHandler = new RowResizeHandler(this);
-    this.columnResizeHandler = new ColumnResizeHandler(this);
-    this.rowResizeHandler = new RowResizeHandler(this);
-    this.selectAllHandler = new SelectAllHandler(this); // Instantiate SelectAllHandler
+    this.selectAllHandler = new SelectAllHandler(this); 
     this.headerDragHandler = new HeaderDragHandler(this);
     this.rowSelectHandler = new RowSelectHandler(this);
     this.cellSelectHandler = new CellSelectHandler(this);
     this.eventRouter = new EventRouter([
-
       this.selectAllHandler,
       this.columnResizeHandler,
       this.rowResizeHandler,
@@ -248,6 +235,11 @@ export class Grid {
     });
   }
 
+  /**
+   * Resizes the canvas to match the container's client width and height.
+   * This is called whenever the container is resized, and also at startup.
+   * It also schedules a render to be done after the resize.
+   */
   private resizeCanvas(): void {
     this.canvas.width = this.container.clientWidth;
     this.canvas.height = this.container.clientHeight;
@@ -255,6 +247,11 @@ export class Grid {
     this.scheduleRender();
   }
 
+  /**
+   * Schedules a render pass to be done on the next animation frame.
+   * Only schedules if not already scheduled and not suppressing render.
+   * This is called whenever the container is resized, or when cell data changes.
+   */
   private scheduleRender(): void {
     if (this.renderScheduled || this.suppressRender) return;
     this.renderScheduled = true;
@@ -299,8 +296,7 @@ export class Grid {
   private addEventListeners(): void {
     // Use pointer events for unified input
     this.canvas.addEventListener('pointerdown', (evt) => this.eventRouter.onPointerDown(evt as unknown as MouseEvent));
-    this.canvas.addEventListener('pointermove', (evt) => this.eventRouter.onPointerMove(evt as unknown as MouseEvent));
-    window.addEventListener('pointermove', (evt) => this.eventRouter.onPointerDrag(evt as unknown as MouseEvent));
+    window.addEventListener('pointermove', (evt) => this.eventRouter.onPointerMove(evt as unknown as MouseEvent));
     window.addEventListener('pointerup', (evt) => this.eventRouter.onPointerUp(evt as unknown as MouseEvent));
     window.addEventListener("keydown", this.onKeyDown.bind(this));
     const undoButton = document.getElementById("undoBtn")!;

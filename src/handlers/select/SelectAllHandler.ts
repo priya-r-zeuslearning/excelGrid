@@ -11,11 +11,25 @@ export class SelectAllHandler implements EventHandler {
     this.grid = grid;
   }
 
+  /**
+   * Returns true if the given (x, y) coordinates are within the top-left "Select All" box.
+   * @param x the x-coordinate of the pointer
+   * @param y the y-coordinate of the pointer
+   * @returns true if the pointer is within the top-left box
+   */
   hitTest(x: number, y: number): boolean {
     // Check if the pointer is within the top-left box
     const currentGridRowHeaderWidth = this.grid.getRowHeaderWidth();
     return x >= 0 && x < currentGridRowHeaderWidth && y >= 0 && y < HEADER_SIZE;
   }
+
+/**
+ * Handles pointer down events for the "Select All" area.
+ * If the user clicks within the top-left "Select All" box, it selects all cells in the grid,
+ * triggers a render update, and updates selection stats and toolbar state if applicable.
+ * 
+ * @param evt The mouse event containing details about the pointer action.
+ */
 
   onPointerDown(evt: MouseEvent): void {
     if (this.hitTest(evt.offsetX, evt.offsetY)) {
@@ -31,6 +45,14 @@ export class SelectAllHandler implements EventHandler {
     }
   }
 
+  /**
+   * Called when pointer is moved
+   * @param evt Mouse event
+   *
+   * If the pointer is moved within the top-left "Select All" box, it changes the
+   * cursor style and communicates hover state to the grid for rendering.
+   * If the pointer is moved out of the box, it clears hover state and triggers a render update.
+   */
   onPointerMove(evt: MouseEvent): void {
     const rect = (evt.target as HTMLElement).getBoundingClientRect();
     const x = evt.clientX - rect.left;
